@@ -36,13 +36,34 @@ async function fubGet(apiKey, fubPath) {
 }
 
 async function fetchAllPages(apiKey, resource, key, extraParams = '', limit = 100) {
-  let all = [], offset = 0;
-  while (true) {
-    const data = await fubGet(apiKey, resource + '?limit=' + limit + '&offset=' + offset + extraParams);
-    const items = data[key] || [];
-    all = all.concat(items);
-    if (items.length < limit || offset >= 5000) break;
-    offset += limit;
+  // First page
+  const first = await fubGet(apiKey, resource + '?limit=' + limit + '&offset=0' + extraParams);
+  const firstItems = first[key] || [];
+  const total = (first._metadata && first._metadata.total) ? parseInt(first._metadata.total) : null;
+
+  if (firstItems.length < limit) return firstItems;
+
+  // Build all remaining offsets up to 25000 or total
+  const maxRecords = 25000;
+  const cap = total ? Math.min(total, maxRecords) : maxRecords;
+  const offsets = [];
+  for (let off = limit; off < cap; off += limit) offsets.push(off);
+
+  // Fetch in parallel batches of 5 to stay within rate limits
+  let all = [...firstItems];
+  const batchSize = 5;
+  for (let i = 0; i < offsets.length; i += batchSize) {
+    const batch = offsets.slice(i, i + batchSize);
+    const results = await Promise.all(
+      batch.map(off =>
+        fubGet(apiKey, resource + '?limit=' + limit + '&offset=' + off + extraParams)
+          .then(d => d[key] || []).catch(() => [])
+      )
+    );
+    for (const items of results) {
+      all = all.concat(items);
+      if (items.length < limit) return all;
+    }
   }
   return all;
 }
@@ -288,6 +309,6 @@ const server = http.createServer(async (req, res) => {
   res.writeHead(404); res.end('Not found');
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log('FUB Scrub web app running on port ' + PORT);
 });
