@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FUB Pipeline Scrub</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f4;color:#1c1c1a;min-height:100vh}
+.topbar{background:#1c1c1a;color:#fff;padding:12px 24px;display:flex;align-items:center;justify-content:space-between}
+.topbar h1{font-size:15px;font-weight:500}
+.topbar .sub{font-size:11px;color:#888}
+.body{padding:1.25rem 1.5rem;max-width:1080px;margin:0 auto}
+.card{background:#fff;border:1px solid #e5e5e3;border-radius:12px;padding:1.1rem 1.25rem;margin-bottom:.9rem}
+.field-label{font-size:11px;color:#6b6b68;display:block;margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+input,select{width:100%;padding:8px 11px;border:1px solid #e5e5e3;border-radius:8px;font-size:14px;font-family:inherit;background:#fff;color:#1c1c1a;outline:none;transition:border .12s}
+input:focus,select:focus{border-color:#378add}
+input[type=password]{font-family:monospace;letter-spacing:.05em}
+.setup-row{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:10px}
+.setup-row>div{flex:1;min-width:150px}
+.btn-group{display:flex;gap:8px;align-items:flex-end}
+button{padding:8px 16px;border:1px solid #d1d1cf;border-radius:8px;font-size:13px;font-family:inherit;background:#fff;color:#1c1c1a;cursor:pointer;white-space:nowrap;transition:all .12s}
+button:hover:not(:disabled){background:#f0f0ee}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.primary{background:#1c1c1a;color:#fff;border-color:#1c1c1a}
+button.primary:hover:not(:disabled){background:#2d2d2b}
+button.copy-btn{background:#EEEDFE;color:#534AB7;border-color:#AFA9EC;font-size:12px;padding:6px 14px}
+button.copy-btn:hover:not(:disabled){background:#CECBF6}
+button.copied{background:#EAF3DE!important;color:#3B6D11!important;border-color:#97C459!important}
+.saved{font-size:11px;color:#3B6D11;background:#EAF3DE;padding:2px 8px;border-radius:99px;margin-left:8px;display:none}
+
+/* Metrics */
+.mstrip{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:.9rem}
+.mc{background:#fff;border:1px solid #e5e5e3;border-radius:10px;padding:.8rem 1rem}
+.ml{font-size:10px;color:#6b6b68;margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.mv{font-size:24px;font-weight:600}
+.mv.tot{color:#1c1c1a}.mv.new{color:#185FA5}.mv.chg{color:#854F0B}
+.mv.nte{color:#534AB7}.mv.brw{color:#0E7A6E}.mv.com{color:#3B6D11}.mv.noc{color:#A32D2D}
+
+/* Tabs */
+.tabs{display:flex;gap:4px;margin-bottom:.9rem;flex-wrap:wrap}
+.tab{padding:6px 14px;border-radius:8px;font-size:13px;font-family:inherit;cursor:pointer;border:1px solid transparent;background:transparent;color:#6b6b68;transition:all .12s;display:flex;align-items:center;gap:6px}
+.tab:hover{background:#fff;border-color:#e5e5e3}
+.tab.active{background:#fff;border-color:#1c1c1a;color:#1c1c1a;font-weight:500}
+.tab .cnt{font-size:11px;padding:1px 7px;border-radius:99px;background:#f0f0ee;color:#6b6b68}
+.tab.active .cnt,.tab.t-new.active .cnt{background:#185FA5;color:#fff}
+.tab.t-new .cnt{background:#E6F1FB;color:#185FA5}
+.tab.t-chg.active .cnt{background:#854F0B;color:#fff}
+.tab.t-chg .cnt{background:#FAEEDA;color:#854F0B}
+.tab.t-nte.active .cnt{background:#534AB7;color:#fff}
+.tab.t-nte .cnt{background:#EEEDFE;color:#534AB7}
+.tab.t-brw.active .cnt{background:#0E7A6E;color:#fff}
+.tab.t-brw .cnt{background:#D4F1EE;color:#0E7A6E}
+.tab.t-com.active .cnt{background:#3B6D11;color:#fff}
+.tab.t-com .cnt{background:#EAF3DE;color:#3B6D11}
+.tab.t-noc.active .cnt{background:#A32D2D;color:#fff}
+.tab.t-noc .cnt{background:#FCEBEB;color:#A32D2D}
+
+/* Panels */
+.panel{display:none}.panel.active{display:block}
+
+/* Table */
+.ltable{width:100%;border-collapse:collapse;font-size:13px}
+.ltable th{text-align:left;font-size:11px;color:#6b6b68;font-weight:600;text-transform:uppercase;letter-spacing:.04em;padding:0 8px 10px;border-bottom:1px solid #e5e5e3}
+.ltable td{padding:9px 8px;border-bottom:1px solid #f5f5f4;vertical-align:top;line-height:1.45}
+.ltable tr:last-child td{border-bottom:none}
+.ltable tr:hover td{background:#fafaf9}
+.lname{font-weight:500;color:#1c1c1a}
+.lmeta{font-size:11px;color:#9b9b98;margin-top:2px}
+.pill{font-size:11px;padding:2px 9px;border-radius:99px;border:1px solid #e5e5e3;color:#6b6b68;white-space:nowrap;display:inline-block}
+.pill.hot{border-color:#0E7A6E;color:#0E7A6E;background:#F0FBF9}
+.stage-arrow{font-size:11px;color:#854F0B}
+.comm-tag{font-size:11px;padding:2px 7px;border-radius:6px;background:#EAF3DE;color:#3B6D11;display:inline-block;margin-right:4px;text-transform:capitalize}
+
+/* Claude box */
+.claude-box{background:#EEEDFE;border:1px solid #AFA9EC;border-radius:10px;padding:1rem 1.25rem;margin-bottom:.9rem;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.claude-box p{font-size:13px;color:#534AB7;line-height:1.55;flex:1;min-width:200px}
+
+/* Status */
+.err{background:#FCEBEB;border:1px solid #F7C1C1;border-radius:8px;padding:.85rem 1rem;font-size:13px;color:#A32D2D;margin-bottom:.9rem}
+.spinner{display:inline-block;width:13px;height:13px;border:2px solid #e5e5e3;border-top-color:#6b6b68;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:4px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.steps{font-size:12px;color:#9b9b98;margin-bottom:.9rem;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.dot{width:7px;height:7px;border-radius:50%;background:#d1d1cf;display:inline-block;transition:background .25s}
+.dot.active{background:#185FA5}.dot.done{background:#3B6D11}
+.lastrun{font-size:11px;color:#9b9b98;margin-left:auto}
+.empty{text-align:center;padding:2rem;color:#9b9b98;font-size:13px}
+.warn-box{font-size:13px;color:#A32D2D;background:#FCEBEB;border-radius:8px;padding:10px 14px;margin-bottom:12px}
+
+@media(max-width:720px){
+  .mstrip{grid-template-columns:repeat(4,1fr)}
+  .tabs .tab span:not(.cnt){display:none}
+  .body{padding:1rem}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>FUB Pipeline Scrub</h1>
+  <span class="sub">Every lead · All stages · Ponds included</span>
+</div>
+
+<div class="body">
+
+  <div class="card">
+    <div style="display:flex;align-items:center;margin-bottom:10px">
+      <span style="font-size:14px;font-weight:600">Follow Up Boss API key</span>
+      <span class="saved" id="savedBadge">✓ Saved</span>
+    </div>
+    <input type="password" id="fubKey" placeholder="Paste your FUB API key..." oninput="onKeyInput()" />
+    <div class="setup-row">
+      <div>
+        <label class="field-label">Filter by agent</label>
+        <select id="agentFilter" disabled><option value="all">All agents</option></select>
+      </div>
+      <div class="btn-group">
+        <button id="loadBtn" onclick="loadAgents()">↓ Load agents</button>
+        <button class="primary" id="runBtn" onclick="runScrub()" disabled>▶ Run full scrub</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="steps" class="steps" style="display:none">
+    <span class="dot" id="d1"></span> Fetching all leads
+    <span class="dot" id="d2"></span> Events &amp; notes
+    <span class="dot" id="d3"></span> Analyzing
+    <span class="dot" id="d4"></span> Done
+    <span class="lastrun" id="lastRun"></span>
+  </div>
+
+  <div id="errBox" class="err" style="display:none"></div>
+
+  <div id="mstrip" class="mstrip" style="display:none">
+    <div class="mc"><div class="ml">Total leads</div><div class="mv tot" id="mTot">—</div></div>
+    <div class="mc"><div class="ml">New (48h)</div><div class="mv new" id="mNew">—</div></div>
+    <div class="mc"><div class="ml">Stage changes</div><div class="mv chg" id="mChg">—</div></div>
+    <div class="mc"><div class="ml">New notes</div><div class="mv nte" id="mNte">—</div></div>
+    <div class="mc"><div class="ml">Home activity</div><div class="mv brw" id="mBrw">—</div></div>
+    <div class="mc"><div class="ml">Comms (48h)</div><div class="mv com" id="mCom">—</div></div>
+    <div class="mc"><div class="ml">No contact</div><div class="mv noc" id="mNoc">—</div></div>
+  </div>
+
+  <div id="claudeBox" class="claude-box" style="display:none">
+    <p><strong>✨ Get Claude's analysis — free</strong> — copy your scrub and paste it into claude.ai for prioritized action items, hot lead outreach, and stale lead rescue suggestions.</p>
+    <button class="copy-btn" id="copyBtn" onclick="copyForClaude()">Copy scrub for Claude.ai</button>
+  </div>
+
+  <div id="tabRow" class="tabs" style="display:none">
+    <button class="tab t-new active" onclick="switchTab('new',this)">🆕 <span>New leads</span> <span class="cnt" id="tnew">0</span></button>
+    <button class="tab t-chg" onclick="switchTab('chg',this)">🔄 <span>Stage changes</span> <span class="cnt" id="tchg">0</span></button>
+    <button class="tab t-nte" onclick="switchTab('nte',this)">📝 <span>Notes</span> <span class="cnt" id="tnte">0</span></button>
+    <button class="tab t-brw" onclick="switchTab('brw',this)">🏠 <span>Home activity</span> <span class="cnt" id="tbrw">0</span></button>
+    <button class="tab t-com" onclick="switchTab('com',this)">💬 <span>Communications</span> <span class="cnt" id="tcom">0</span></button>
+    <button class="tab t-noc" onclick="switchTab('noc',this)">🔇 <span>No contact</span> <span class="cnt" id="tnoc">0</span></button>
+  </div>
+
+  <div id="panel-new" class="panel active"></div>
+  <div id="panel-chg" class="panel"></div>
+  <div id="panel-nte" class="panel"></div>
+  <div id="panel-brw" class="panel"></div>
+  <div id="panel-com" class="panel"></div>
+  <div id="panel-noc" class="panel"></div>
+
+</div>
+
+<script>
+let lastData = null;
+
+// Persist key in localStorage
+function saveKey(k){ try{ localStorage.setItem('fub_key', k); }catch(e){} }
+function loadKey(){ try{ return localStorage.getItem('fub_key')||''; }catch(e){ return ''; } }
+
+function dot(n,s){ const d=document.getElementById('d'+n); if(d) d.className='dot '+s; }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function timeAgo(d){
+  if(!d) return '';
+  const h = Math.round((Date.now()-new Date(d).getTime())/3600000);
+  if(h<1) return 'just now';
+  if(h<24) return h+'h ago';
+  return Math.round(h/24)+'d ago';
+}
+function showErr(m){ const b=document.getElementById('errBox'); b.textContent=m; b.style.display='block'; }
+function clearErr(){ document.getElementById('errBox').style.display='none'; }
+
+function switchTab(tab, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('[id^="panel-"]').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-'+tab).classList.add('active');
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = loadKey();
+  if (saved) {
+    document.getElementById('fubKey').value = saved;
+    document.getElementById('savedBadge').style.display = 'inline';
+    loadAgents(true);
+  }
+});
+
+function onKeyInput() {
+  document.getElementById('savedBadge').style.display = 'none';
+  document.getElementById('runBtn').disabled = true;
+}
+
+async function loadAgents(silent=false) {
+  const key = document.getElementById('fubKey').value.trim();
+  if (!key) { if(!silent) showErr('Enter your FUB API key first.'); return; }
+  clearErr();
+  const btn = document.getElementById('loadBtn');
+  btn.disabled = true; btn.textContent = 'Loading...';
+  try {
+    const r = await fetch('/api/agents', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({fubKey: key}) });
+    const agents = await r.json();
+    if (agents.error) throw new Error(agents.error);
+    const sel = document.getElementById('agentFilter');
+    sel.innerHTML = '<option value="all">All agents</option>';
+    agents.forEach(u => {
+      const o = document.createElement('option');
+      o.value = u.id; o.textContent = u.name || u.email;
+      sel.appendChild(o);
+    });
+    sel.disabled = false;
+    document.getElementById('runBtn').disabled = false;
+    btn.textContent = '✓ Agents loaded';
+    saveKey(key);
+    document.getElementById('savedBadge').style.display = 'inline';
+  } catch(e) {
+    if(!silent) showErr('Error: ' + e.message);
+    btn.disabled = false; btn.textContent = '↓ Load agents';
+  }
+}
+
+// ---------- Render ----------
+function renderNewLeads(leads) {
+  if (!leads.length) return '<div class="empty">No new leads in the last 48 hours.</div>';
+  let h = '<table class="ltable"><thead><tr><th>Name</th><th>Stage</th><th>Agent</th><th>Source</th><th>Arrived</th></tr></thead><tbody>';
+  leads.forEach(l => { h += `<tr><td><div class="lname">${esc(l.name)}</div><div class="lmeta">${esc(l.email||l.phone||'')}</div></td><td><span class="pill">${esc(l.stage)}</span></td><td>${esc(l.agent)}</td><td>${esc(l.source||'—')}</td><td>${timeAgo(l.created)}</td></tr>`; });
+  return h + '</tbody></table>';
+}
+
+function renderStageChanges(leads) {
+  if (!leads.length) return '<div class="empty">No stage changes detected in the last 48 hours.</div>';
+  let h = '<table class="ltable"><thead><tr><th>Name</th><th>Current Stage</th><th>Agent</th><th>Change detail</th><th>Updated</th></tr></thead><tbody>';
+  leads.forEach(l => {
+    const detail = l.stageDetails && l.stageDetails.length ? l.stageDetails.map(d => `<span class="stage-arrow">${esc(d.from)} → ${esc(d.to)}</span>`).join(', ') : '—';
+    h += `<tr><td><div class="lname">${esc(l.name)}</div></td><td><span class="pill">${esc(l.stage)}</span></td><td>${esc(l.agent)}</td><td>${detail}</td><td>${timeAgo(l.updated)}</td></tr>`;
+  });
+  return h + '</tbody></table>';
+}
+
+function renderNotes(notes) {
+  if (!notes.length) return '<div class="empty">No new notes in the last 48 hours.</div>';
+  let h = '<table class="ltable"><thead><tr><th>Lead</th><th>Stage</th><th>Added by</th><th>Note</th><th>When</th></tr></thead><tbody>';
+  notes.forEach(n => { h += `<tr><td><div class="lname">${esc(n.leadName)}</div></td><td><span class="pill">${esc(n.leadStage)}</span></td><td>${esc(n.author)}</td><td><span style="font-size:12px;color:#444">${esc(n.note)}</span></td><td>${timeAgo(n.created)}</td></tr>`; });
+  return h + '</tbody></table>';
+}
+
+function renderBrowsing(leads) {
+  if (!leads.length) return '<div class="empty">No home or website activity detected in the last 7 days.</div>';
+  let h = '<table class="ltable"><thead><tr><th>Lead</th><th>Stage</th><th>Agent</th><th>Latest activity</th><th>Sessions</th><th>Last seen</th></tr></thead><tbody>';
+  leads.forEach(l => { h += `<tr><td><div class="lname">${esc(l.name)}</div></td><td><span class="pill hot">${esc(l.stage)}</span></td><td>${esc(l.agent)}</td><td><span style="font-size:12px;color:#0E7A6E">${esc(l.latestActivity)}</span></td><td><strong>${l.activityCount}</strong></td><td>${timeAgo(l.activityDate)}</td></tr>`; });
+  return h + '</tbody></table>';
+}
+
+function renderComms(leads) {
+  if (!leads.length) return '<div class="empty">No agent-lead communications in the last 48 hours.</div>';
+  let h = '<table class="ltable"><thead><tr><th>Lead</th><th>Stage</th><th>Agent</th><th>Communication</th><th>When</th></tr></thead><tbody>';
+  leads.forEach(l => {
+    const c = l.comms[0];
+    h += `<tr><td><div class="lname">${esc(l.name)}</div></td><td><span class="pill">${esc(l.stage)}</span></td><td>${esc(l.agent)}</td><td><span class="comm-tag">${esc(c&&c.type||'comm')}</span><span style="font-size:12px;color:#444">${esc(c&&c.desc||'')}</span></td><td>${timeAgo(c&&c.when)}</td></tr>`;
+  });
+  return h + '</tbody></table>';
+}
+
+function renderNoContact(leads) {
+  if (!leads.length) return '<div class="empty">All leads have at least one communication or note. Great work!</div>';
+  let h = '<div class="warn-box">⚠️ These leads have <strong>never</strong> been called, texted, emailed, or had a note added — including pond leads.</div>';
+  h += '<table class="ltable"><thead><tr><th>Name</th><th>Stage</th><th>Agent</th><th>Source</th><th>Days since added</th></tr></thead><tbody>';
+  leads.forEach(l => { h += `<tr><td><div class="lname">${esc(l.name)}</div><div class="lmeta">${esc(l.email||l.phone||'')}</div></td><td><span class="pill">${esc(l.stage)}</span></td><td>${esc(l.agent)}</td><td>${esc(l.source||'—')}</td><td><strong style="color:#A32D2D">${l.daysSinceCreated}d</strong></td></tr>`; });
+  return h + '</tbody></table>';
+}
+
+// ---------- Claude prompt ----------
+function buildPrompt(data) {
+  const agent = document.getElementById('agentFilter').selectedOptions[0].text;
+  let t = `Analyze this Follow Up Boss full pipeline scrub (${new Date().toLocaleDateString()}, agent filter: ${agent}) and give me:\n1. Overall pipeline health (3-4 sentences)\n2. Urgent actions — new leads needing immediate reach-out\n3. Hot leads — who is browsing homes and what to say\n4. Stage change follow-ups\n5. No-contact leads — top 5 to rescue with specific suggestions\n6. Top 5 action items for today\n\n--- SCRUB DATA ---\n`;
+  t += `Totals: ${data.totals.total} total | ${data.totals.newLeads} new (48h) | ${data.totals.stageChanges} stage changes | ${data.totals.newNotes} new notes | ${data.totals.browsing} browsing | ${data.totals.comms} comms | ${data.totals.noContact} no contact ever\n\n`;
+  if(data.newLeads.length){ t+=`NEW LEADS (48h):\n${data.newLeads.slice(0,15).map(l=>`- ${l.name} | ${l.stage} | Agent: ${l.agent} | Source: ${l.source||'unknown'} | ${l.hoursAgo}h ago`).join('\n')}\n\n`; }
+  if(data.stageChangedLeads.length){ t+=`STAGE CHANGES:\n${data.stageChangedLeads.slice(0,15).map(l=>`- ${l.name} | Now: ${l.stage} | Agent: ${l.agent}`).join('\n')}\n\n`; }
+  if(data.recentNotes.length){ t+=`NEW NOTES:\n${data.recentNotes.slice(0,10).map(n=>`- ${n.leadName} (by ${n.author}): "${n.note}"`).join('\n')}\n\n`; }
+  if(data.browsingLeads.length){ t+=`HOME/WEBSITE ACTIVITY:\n${data.browsingLeads.slice(0,15).map(l=>`- ${l.name} | ${l.stage} | Agent: ${l.agent} | ${l.activityCount} sessions | ${l.latestActivity}`).join('\n')}\n\n`; }
+  if(data.commLeads.length){ t+=`RECENT COMMS:\n${data.commLeads.slice(0,10).map(l=>`- ${l.name} | ${l.stage} | ${l.comms[0]&&l.comms[0].type||'comm'}: ${l.comms[0]&&l.comms[0].desc||''}`).join('\n')}\n\n`; }
+  if(data.noContactLeads.length){ t+=`NO CONTACT EVER:\n${data.noContactLeads.slice(0,20).map(l=>`- ${l.name} | ${l.stage} | Agent: ${l.agent} | Added ${l.daysSinceCreated}d ago`).join('\n')}`; }
+  return t;
+}
+
+function copyForClaude() {
+  if (!lastData) return;
+  navigator.clipboard.writeText(buildPrompt(lastData)).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '✓ Copied!'; btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy scrub for Claude.ai'; btn.classList.remove('copied'); }, 2500);
+  });
+}
+
+// ---------- Run scrub ----------
+async function runScrub() {
+  clearErr();
+  const key = document.getElementById('fubKey').value.trim();
+  if (!key) { showErr('Enter your FUB API key.'); return; }
+
+  document.getElementById('mstrip').style.display = 'none';
+  document.getElementById('claudeBox').style.display = 'none';
+  document.getElementById('tabRow').style.display = 'none';
+  ['new','chg','nte','brw','com','noc'].forEach(t => document.getElementById('panel-'+t).innerHTML = '');
+  document.getElementById('steps').style.display = 'flex';
+  document.getElementById('lastRun').textContent = '';
+  [1,2,3,4].forEach(i => dot(i,''));
+
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Scrubbing...';
+  dot(1,'active'); dot(2,'active');
+
+  try {
+    const r = await fetch('/api/scrub', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fubKey: key, agentId: document.getElementById('agentFilter').value })
+    });
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+    lastData = data;
+    dot(1,'done'); dot(2,'done'); dot(3,'active');
+
+    document.getElementById('mTot').textContent = data.totals.total;
+    document.getElementById('mNew').textContent = data.totals.newLeads;
+    document.getElementById('mChg').textContent = data.totals.stageChanges;
+    document.getElementById('mNte').textContent = data.totals.newNotes;
+    document.getElementById('mBrw').textContent = data.totals.browsing;
+    document.getElementById('mCom').textContent = data.totals.comms;
+    document.getElementById('mNoc').textContent = data.totals.noContact;
+    document.getElementById('mstrip').style.display = 'grid';
+
+    document.getElementById('tnew').textContent = data.totals.newLeads;
+    document.getElementById('tchg').textContent = data.totals.stageChanges;
+    document.getElementById('tnte').textContent = data.totals.newNotes;
+    document.getElementById('tbrw').textContent = data.totals.browsing;
+    document.getElementById('tcom').textContent = data.totals.comms;
+    document.getElementById('tnoc').textContent = data.totals.noContact;
+
+    document.getElementById('panel-new').innerHTML = renderNewLeads(data.newLeads);
+    document.getElementById('panel-chg').innerHTML = renderStageChanges(data.stageChangedLeads);
+    document.getElementById('panel-nte').innerHTML = renderNotes(data.recentNotes);
+    document.getElementById('panel-brw').innerHTML = renderBrowsing(data.browsingLeads);
+    document.getElementById('panel-com').innerHTML = renderComms(data.commLeads);
+    document.getElementById('panel-noc').innerHTML = renderNoContact(data.noContactLeads);
+
+    dot(3,'done'); dot(4,'done');
+    document.getElementById('lastRun').textContent = 'Last run: ' + new Date().toLocaleTimeString();
+    document.getElementById('claudeBox').style.display = 'flex';
+    document.getElementById('tabRow').style.display = 'flex';
+    btn.disabled = false; btn.innerHTML = '↻ Re-run scrub';
+  } catch(e) {
+    showErr('Error: ' + e.message);
+    [1,2,3,4].forEach(i => dot(i,''));
+    btn.disabled = false; btn.innerHTML = '▶ Run full scrub';
+  }
+}
+</script>
+</body>
+</html>
